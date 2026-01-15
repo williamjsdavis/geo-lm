@@ -3,7 +3,12 @@
 import pytest
 
 from geo_lm.parsers.dsl import parse, validate, parse_and_validate
-from geo_lm.parsers.dsl.validator import ValidationErrorType
+from geo_lm.parsers.dsl.errors import (
+    UndefinedReferenceError,
+    CircularDependencyError,
+    DuplicateIDError,
+    TemporalInconsistencyError,
+)
 
 
 class TestDSLValidator:
@@ -26,8 +31,7 @@ class TestDSLValidator:
         assert len(result.errors) > 0
 
         # Check for the specific error type
-        error_types = [e.error_type for e in result.errors]
-        assert ValidationErrorType.UNDEFINED_REFERENCE in error_types
+        assert any(isinstance(e, UndefinedReferenceError) for e in result.errors)
 
     def test_validate_circular_dependency(self, sample_dsl_circular):
         """Test validation catches circular dependencies."""
@@ -35,8 +39,7 @@ class TestDSLValidator:
         result = validate(program)
 
         assert not result.is_valid
-        error_types = [e.error_type for e in result.errors]
-        assert ValidationErrorType.CIRCULAR_DEPENDENCY in error_types
+        assert any(isinstance(e, CircularDependencyError) for e in result.errors)
 
     def test_validate_duplicate_ids(self):
         """Test validation catches duplicate IDs."""
@@ -48,8 +51,7 @@ class TestDSLValidator:
         result = validate(program)
 
         assert not result.is_valid
-        error_types = [e.error_type for e in result.errors]
-        assert ValidationErrorType.DUPLICATE_ID in error_types
+        assert any(isinstance(e, DuplicateIDError) for e in result.errors)
 
     def test_validate_missing_rock_property(self):
         """Test validation catches missing required rock property."""
@@ -77,8 +79,7 @@ class TestDSLValidator:
         result = validate(program)
 
         assert not result.is_valid
-        error_types = [e.error_type for e in result.errors]
-        assert ValidationErrorType.UNDEFINED_REFERENCE in error_types
+        assert any(isinstance(e, UndefinedReferenceError) for e in result.errors)
 
     def test_validate_temporal_consistency(self):
         """Test validation catches temporal inconsistencies."""
@@ -94,13 +95,9 @@ class TestDSLValidator:
         program = parse(dsl)
         result = validate(program)
 
-        # Should have a temporal warning or error
+        # Should have a temporal error
         has_temporal_issue = any(
-            e.error_type == ValidationErrorType.TEMPORAL_INCONSISTENCY
-            for e in result.errors
-        ) or any(
-            w.error_type == ValidationErrorType.TEMPORAL_INCONSISTENCY
-            for w in result.warnings
+            isinstance(e, TemporalInconsistencyError) for e in result.errors
         )
         assert has_temporal_issue
 

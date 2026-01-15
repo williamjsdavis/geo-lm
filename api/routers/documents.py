@@ -113,8 +113,7 @@ async def extract_text(document_id: int):
                 detail="Source file not found",
             )
 
-        # Import PDF parser from hutton_lm (legacy) for now
-        from hutton_lm.pdf_parser import extract_text_from_pdf
+        from geo_lm.parsers.pdf import extract_text_from_pdf
 
         doc.status = "processing"
         await doc.save()

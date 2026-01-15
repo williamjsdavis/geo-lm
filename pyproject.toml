@@ -15,7 +15,6 @@ numpy = "^2.2.5"
 pandas = "^2.2.3"
 scipy = "^1.15.2"
 torch = "^2.7.0"
-pymupdf = "^1.25.5"
 openai = "^1.77.0"
 pypdf2 = "^3.0.1"
 # geo-lm v2 dependencies
