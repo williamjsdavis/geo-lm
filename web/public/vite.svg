@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="geo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0ea5e9"/>
+      <stop offset="100%" style="stop-color:#0369a1"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="6" fill="url(#geo-grad)"/>
+  <path d="M8 24 L16 8 L24 24 Z" fill="none" stroke="white" stroke-width="2"/>
+  <circle cx="16" cy="18" r="3" fill="white"/>
+</svg>

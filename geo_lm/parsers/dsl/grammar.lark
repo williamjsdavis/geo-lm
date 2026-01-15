@@ -1,0 +1,84 @@
+// Geology DSL Grammar for geo-lm v2
+// Supports: ROCK, DEPOSITION, EROSION, INTRUSION
+// Extensible for: FAULT, FOLD, METAMORPHISM
+
+start: statement*
+
+statement: rock_stmt
+         | deposition_stmt
+         | erosion_stmt
+         | intrusion_stmt
+
+// --- Statement Types ---
+
+rock_stmt: "ROCK" ID "[" rock_body "]"
+
+deposition_stmt: "DEPOSITION" ID "[" event_body "]"
+
+erosion_stmt: "EROSION" ID "[" erosion_body "]"
+
+intrusion_stmt: "INTRUSION" ID "[" intrusion_body "]"
+
+// --- Statement Bodies ---
+
+rock_body: (rock_prop ";"?)*
+
+rock_prop: "name:" STRING          -> name_prop
+         | "type:" ROCK_TYPE       -> type_prop
+         | "age:" age_value        -> age_prop
+
+event_body: (event_prop ";"?)*
+
+event_prop: "rock:" ID             -> rock_ref_prop
+          | "time:" time_value     -> time_prop
+          | "after:" id_list       -> after_prop
+
+erosion_body: (erosion_prop ";"?)*
+
+erosion_prop: "time:" time_value   -> time_prop
+            | "after:" id_list     -> after_prop
+
+intrusion_body: (intrusion_prop ";"?)*
+
+intrusion_prop: "rock:" ID              -> rock_ref_prop
+              | "style:" INTRUSION_STYLE -> style_prop
+              | "time:" time_value       -> time_prop
+              | "after:" id_list         -> after_prop
+
+// --- Values ---
+
+age_value: NUMBER TIME_UNIT       -> absolute_age
+         | UNKNOWN                -> unknown_age
+         | EPOCH_NAME             -> epoch_age
+
+time_value: NUMBER TIME_UNIT      -> absolute_time
+          | UNKNOWN               -> unknown_time
+          | EPOCH_NAME            -> epoch_time
+
+id_list: ID ("," ID)*
+
+// --- Terminals ---
+
+ROCK_TYPE: "sedimentary" | "volcanic" | "intrusive" | "metamorphic"
+INTRUSION_STYLE: "dike" | "sill" | "stock" | "batholith"
+TIME_UNIT: "Ma" | "ka" | "Ga"
+UNKNOWN: "\"?\""
+
+// ID starts with uppercase letter, followed by alphanumerics/underscore
+ID: /[A-Z][A-Za-z0-9_]*/
+
+// Numbers can be integers or decimals
+NUMBER: /\d+(\.\d+)?/
+
+// Strings are anything between double quotes (excluding quotes)
+STRING: /"[^"]*"/ | /[^;\[\]]+(?=;|\])/
+
+// Epoch names - words that start with lowercase (e.g., "late Eocene")
+EPOCH_NAME: /[a-z][A-Za-z\s]*/
+
+// Comments start with # and continue to end of line
+COMMENT: "#" /[^\n]/*
+
+%import common.WS
+%ignore WS
+%ignore COMMENT

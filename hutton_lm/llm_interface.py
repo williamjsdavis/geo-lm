@@ -392,10 +392,14 @@ def llm_consolidate_parsed_text(pdf_text: str) -> str:
     {pdf_text}
     """
 
-    # TODO: Move API Key/Base URL to config or environment variables
-    # Initialize the LLM client
+    # Initialize the LLM client using environment variable
+    api_key = os.environ.get("LLAMA_API_KEY")
+    if not api_key:
+        print("Error: LLAMA_API_KEY environment variable not set.")
+        return "Error: LLAMA_API_KEY not configured."
+
     client = OpenAI(
-        api_key="LLM|1092127122939929|swnut7Dzo4N-CdXCmXFLKxWJC9s",  # Sensitive - move out
+        api_key=api_key,
         base_url="https://api.llama.com/compat/v1/",
     )
     try:
@@ -488,10 +492,14 @@ def llm_generate_dsl_summary(consolidated_text: str) -> str:
     """
     prompt_dsl = prompt_dsl_template.format(consolidated_text)
 
-    # Re-use the same client setup as consolidation for consistency
-    # TODO: Centralize client initialization or pass it as an argument
+    # Initialize the LLM client using environment variable
+    api_key = os.environ.get("LLAMA_API_KEY")
+    if not api_key:
+        print("Error: LLAMA_API_KEY environment variable not set.")
+        return "Error: LLAMA_API_KEY not configured."
+
     client = OpenAI(
-        api_key="LLM|1092127122939929|swnut7Dzo4N-CdXCmXFLKxWJC9s",  # Sensitive - move out
+        api_key=api_key,
         base_url="https://api.llama.com/compat/v1/",
     )
     try:
