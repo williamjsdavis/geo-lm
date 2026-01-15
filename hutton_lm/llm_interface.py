@@ -1,6 +1,4 @@
 import os
-import re
-from datetime import datetime
 from openai import OpenAI
 
 # Use relative import for data constants within the package
@@ -11,13 +9,6 @@ from .data_loader import (
     _WORKSPACE_ROOT,
 )
 
-# Attempt to import the Llama API client, handle import error gracefully
-try:
-    from llama_api_client import LlamaAPIClient, APIError
-except ImportError:
-    print("Warning: llama_api_client not installed. LLM mode will not be available.")
-    LlamaAPIClient = None
-    APIError = None
 
 # --- LLM Helper Functions ---
 
@@ -40,7 +31,6 @@ def get_llm_prompt(
             with open(full_dsl_path, "r") as f:
                 dsl_text = f.read()
             print(f"Successfully read DSL text from: {full_dsl_path}")
-            # NOTE: dsl_text is read but not yet used in the prompt generation below.
         except FileNotFoundError:
             print(
                 f"Warning: DSL file not found at '{dsl_text_path}'. Proceeding without DSL text."
@@ -138,16 +128,13 @@ Structure Data Format Reference (DO NOT COPY VALUES):
             print(
                 "Warning: 'DSL' prompt type selected, but no DSL text was successfully read. Falling back to 'default' prompt type."
             )
-            # Fallback to default if DSL text isn't available
-            return get_llm_prompt(
-                "default", dsl_text_path=None
-            )  # Pass None to avoid re-reading attempt
+            return get_llm_prompt("default", dsl_text_path=None)
 
     else:
         print(
             f"Warning: Unknown prompt type '{prompt_type}'. Falling back to default prompt."
         )
-        return get_llm_prompt("default", dsl_text_path=None)  # Pass None here too
+        return get_llm_prompt("default", dsl_text_path=None)
 
     # Combine the sections
     full_prompt = f"""{prompt_intro}
@@ -161,226 +148,13 @@ Structure Data Format Reference (DO NOT COPY VALUES):
     return full_prompt
 
 
-def initialize_llm():
-    """Initializes and returns the Llama API client."""
-    if LlamaAPIClient is None:
-        print(
-            "Error: LlamaAPIClient is not available. Please install llama_api_client."
-        )
-        return None
-    api_key = os.environ.get("LLAMA_API_KEY")
-    if not api_key:
-        print("Error: LLAMA_API_KEY environment variable not set.")
-        return None
-    try:
-        client = LlamaAPIClient(api_key=api_key)
-        return client
-    except Exception as e:
-        print(f"Error initializing Llama API client: {e}")
-        return None
-
-
-def generate_data_with_llm(client, prompt, temperature):
-    """Calls the LLM API to generate data based on the prompt."""
-    if not client or not APIError:
-        print("Error: LLM Client or APIError not available.")
-        return None
-    try:
-        print(f"Sending prompt to LLM (Temperature: {temperature})...")
-        response = client.chat.completions.create(
-            model="Llama-4-Maverick-17B-128E-Instruct-FP8",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=temperature,
-        )
-        print("LLM response received.")
-        print(response)  # Keep full response print for debugging
-        return response
-    except APIError as e:
-        print(f"LLM API Error: {e}")
-        return None
-    except Exception as e:
-        print(f"An unexpected error occurred during LLM generation: {e}")
-        return None
-
-
-def parse_llm_response(llm_response_object):
-    """Parses the LLM response object to extract points, orientations, and structure CSV data."""
-    response_text = None
-    try:
-        # Extract the text content from the response object structure
-        if (
-            llm_response_object
-            and hasattr(llm_response_object, "completion_message")
-            and hasattr(llm_response_object.completion_message, "content")
-            and hasattr(llm_response_object.completion_message.content, "text")
-        ):
-            response_text = llm_response_object.completion_message.content.text
-        else:
-            print("Error: Unexpected LLM response object structure.")
-            return None, None, None
-
-    except AttributeError as e:
-        print(f"Error accessing attributes in LLM response object: {e}")
-        return None, None, None
-
-    if not response_text:
-        print("Error: No text content found in LLM response.")
-        return None, None, None
-
-    # Use regex to find the data blocks, allowing for potential markdown code fences
-    points_match = re.search(
-        r"(?s)=== POINTS DATA ===.*?```csv\n(.*?)\n```", response_text
-    )
-    if not points_match:  # Fallback without code fences
-        points_match = re.search(
-            r"(?s)=== POINTS DATA ===\n(.*?)\n=== ORIENTATIONS DATA ===", response_text
-        )
-
-    orientations_match = re.search(
-        r"(?s)=== ORIENTATIONS DATA ===.*?```csv\n(.*?)\n```", response_text
-    )
-    if not orientations_match:  # Fallback without code fences
-        orientations_match = re.search(
-            r"(?s)=== ORIENTATIONS DATA ===\n(.*?)\n=== STRUCTURE DATA ===",
-            response_text,
-        )
-
-    structure_match = re.search(
-        r"(?s)=== STRUCTURE DATA ===.*?```csv\n(.*?)\n```", response_text
-    )
-    if not structure_match:  # Fallback without code fences
-        structure_match = re.search(
-            r"(?s)=== STRUCTURE DATA ===\n(.*?)\Z", response_text
-        )
-
-    points_csv = points_match.group(1).strip() if points_match else None
-    orientations_csv = (
-        orientations_match.group(1).strip() if orientations_match else None
-    )
-    structure_csv = structure_match.group(1).strip() if structure_match else None
-
-    if not points_csv or not orientations_csv or not structure_csv:
-        print(
-            "Error: Could not parse points, orientations, and/or structure data from LLM response text."
-        )
-        print(
-            "Expected format markers: === POINTS DATA ===, === ORIENTATIONS DATA ===, === STRUCTURE DATA ==="
-        )
-        return None, None, None
-
-    return points_csv, orientations_csv, structure_csv
-
-
-def save_generated_data(points_csv, orientations_csv, structure_csv, output_dir):
-    """Saves the generated points, orientations, and structure data to timestamped files."""
-    try:
-        # Ensure output directory is absolute or relative to workspace root (from data_loader)
-        # This assumes output_dir might be relative
-        # If output_dir needs to be relative to where script is run, adjust accordingly
-        if not os.path.isabs(output_dir):
-            from .data_loader import (
-                _WORKSPACE_ROOT,
-            )  # Use the root defined in data_loader
-
-            output_dir = os.path.join(_WORKSPACE_ROOT, output_dir)
-
-        os.makedirs(output_dir, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        points_filename = os.path.join(output_dir, f"points_{timestamp}.csv")
-        orientations_filename = os.path.join(
-            output_dir, f"orientations_{timestamp}.csv"
-        )
-        structure_filename = os.path.join(output_dir, f"structure_{timestamp}.csv")
-
-        with open(points_filename, "w") as f:
-            f.write(points_csv)
-        print(f"Saved generated points data to: {points_filename}")
-
-        with open(orientations_filename, "w") as f:
-            f.write(orientations_csv)
-        print(f"Saved generated orientations data to: {orientations_filename}")
-
-        with open(structure_filename, "w") as f:
-            f.write(structure_csv)
-        print(f"Saved generated structure data to: {structure_filename}")
-
-        return points_filename, orientations_filename, structure_filename
-    except OSError as e:
-        print(f"Error creating directory or writing files: {e}")
-        return None, None, None
-    except Exception as e:
-        print(f"An unexpected error occurred during saving: {e}")
-        return None, None, None
-
-
-# --- End LLM Helper Functions ---
-
-
-# --- Deprecated LLM Functions --- #
-def generate_input_orientations_llm():
-    """Deprecated: Generate input orientations using Llama 4 API."""
-    pass
-
-
-def generate_input_points_llm():
-    """Deprecated: Generate input points using Llama 4 API."""
-    pass
-
-
-# -------------------------------- #
-
-# --- LLM Orchestration Function ---
-
-
-def run_llm_generation(prompt_type: str, temperature: float, output_dir: str):
-    """Orchestrates LLM data generation (points, orientations, structure)."""
-    client = initialize_llm()
-    if not client:
-        print("Exiting due to LLM initialization failure.")
-        return None, None, None
-
-    prompt = get_llm_prompt(prompt_type)
-
-    llm_response = generate_data_with_llm(client, prompt, temperature)
-    if not llm_response:
-        print("Failed to get response from LLM. Exiting.")
-        return None, None, None
-
-    points_csv, orientations_csv, structure_csv = parse_llm_response(llm_response)
-    if not points_csv or not orientations_csv or not structure_csv:
-        print("Failed to parse LLM response. Exiting.")
-        return None, None, None
-
-    # --- Print generated data --- #
-    print("\n--- Generated Points Data ---")
-    print(points_csv)
-    print("\n--- Generated Orientations Data ---")
-    print(orientations_csv)
-    print("\n--- Generated Structure Data ---")
-    print(structure_csv)
-    print("\n-----------------------------\n")
-    # ---------------------------- #
-
-    generated_files = save_generated_data(
-        points_csv, orientations_csv, structure_csv, output_dir
-    )
-
-    if not all(generated_files):
-        print("Failed to save one or more generated data files. Exiting.")
-        return None, None, None
-
-    return generated_files  # Returns (points_filename, orientations_filename, structure_filename)
-
-
 # --- Text Consolidation --- #
 
 
 def llm_consolidate_parsed_text(pdf_text: str) -> str:
     """
-    Consolidate the parsed text using the LLM
+    Consolidate the parsed text using the LLM.
     """
-
-    # Define the prompt text
     prompt = f"""
     You are a senior geologist with many years of experience.
     You are given a geological description of a region from a report.
@@ -392,10 +166,13 @@ def llm_consolidate_parsed_text(pdf_text: str) -> str:
     {pdf_text}
     """
 
-    # TODO: Move API Key/Base URL to config or environment variables
-    # Initialize the LLM client
+    api_key = os.environ.get("LLAMA_API_KEY")
+    if not api_key:
+        print("Error: LLAMA_API_KEY environment variable not set.")
+        return "Error: LLAMA_API_KEY not configured."
+
     client = OpenAI(
-        api_key="LLM|1092127122939929|swnut7Dzo4N-CdXCmXFLKxWJC9s",  # Sensitive - move out
+        api_key=api_key,
         base_url="https://api.llama.com/compat/v1/",
     )
     try:
@@ -467,16 +244,16 @@ INTRUSION   I2 [ rock: R4;   style: dike;   time: 34Ma; after: I1 ]
 
 ── INSTRUCTIONS ──
 
-• Parse the geological description.  
-• Identify all distinct rock units, depositional events, erosional events, and intrusive events.  
-• Assign a unique short ID to each (e.g. R1, D1, E1, I1…).  
-• Fill in all known fields (`name`, `type`, `age`, `rock`, `time`, `style`, `after`).  
-• Use absolute ages when given; otherwise use `after:` relationships to order events.  
-• **Output ONLY** the DSL statements (one per line), in the order:  
-  1. All `ROCK` definitions  
-  2. All `DEPOSITION` statements  
-  3. All `EROSION` statements  
-  4. All `INTRUSION` statements  
+• Parse the geological description.
+• Identify all distinct rock units, depositional events, erosional events, and intrusive events.
+• Assign a unique short ID to each (e.g. R1, D1, E1, I1…).
+• Fill in all known fields (`name`, `type`, `age`, `rock`, `time`, `style`, `after`).
+• Use absolute ages when given; otherwise use `after:` relationships to order events.
+• **Output ONLY** the DSL statements (one per line), in the order:
+  1. All `ROCK` definitions
+  2. All `DEPOSITION` statements
+  3. All `EROSION` statements
+  4. All `INTRUSION` statements
 
 Do **not** include any explanatory text—only the DSL code.
 """
@@ -488,21 +265,21 @@ def llm_generate_dsl_summary(consolidated_text: str) -> str:
     """
     prompt_dsl = prompt_dsl_template.format(consolidated_text)
 
-    # Re-use the same client setup as consolidation for consistency
-    # TODO: Centralize client initialization or pass it as an argument
+    api_key = os.environ.get("LLAMA_API_KEY")
+    if not api_key:
+        print("Error: LLAMA_API_KEY environment variable not set.")
+        return "Error: LLAMA_API_KEY not configured."
+
     client = OpenAI(
-        api_key="LLM|1092127122939929|swnut7Dzo4N-CdXCmXFLKxWJC9s",  # Sensitive - move out
+        api_key=api_key,
         base_url="https://api.llama.com/compat/v1/",
     )
     try:
         completion = client.chat.completions.create(
-            model="Llama-4-Maverick-17B-128E-Instruct-FP8",  # Consider if a different model/params are needed
+            model="Llama-4-Maverick-17B-128E-Instruct-FP8",
             messages=[{"role": "user", "content": prompt_dsl}],
         )
         return completion.choices[0].message.content
     except Exception as e:
         print(f"Error during LLM DSL generation: {e}")
         return "Error: Failed to generate DSL."
-
-
-# -----------------------------------

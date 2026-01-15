@@ -43,3 +43,13 @@ Thumbs.db
 
 # Hutton LM Specific (add here as needed)
 *.hlog
+
+# Application data directories
+/data/
+/uploads/
+/exports/
+*.db
+*.db-journal
+
+# Local env overrides
+.env.local
