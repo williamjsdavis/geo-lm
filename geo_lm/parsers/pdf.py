@@ -1,11 +1,14 @@
+"""PDF text extraction utilities."""
+
 import os
-import PyPDF2
-from tqdm import tqdm
 from typing import Optional
 
+import PyPDF2
+from tqdm import tqdm
 
-# https://github.com/meta-llama/llama-cookbook/blob/main/end-to-end-use-cases/NotebookLlama/Step-1%20PDF-Pre-Processing-Logic.ipynb
+
 def validate_pdf(file_path: str) -> bool:
+    """Validate that the file exists and is a PDF."""
     if not os.path.exists(file_path):
         print(f"Error: File not found at path: {file_path}")
         return False
@@ -16,31 +19,33 @@ def validate_pdf(file_path: str) -> bool:
 
 
 def extract_text_from_pdf(file_path: str, max_chars: int = -1) -> Optional[str]:
-    # max_chars = -1 for no text length limit
+    """
+    Extract text content from a PDF file.
+
+    Args:
+        file_path: Path to the PDF file
+        max_chars: Maximum characters to extract (-1 for no limit)
+
+    Returns:
+        Extracted text or None if extraction fails
+    """
     if not validate_pdf(file_path):
         return None
 
     try:
         with open(file_path, "rb") as file:
-            # Create PDF reader object
             pdf_reader = PyPDF2.PdfReader(file)
-
-            # Get total number of pages
             num_pages = len(pdf_reader.pages)
             print(f"Processing PDF with {num_pages} pages...")
 
             extracted_text = []
             total_chars = 0
 
-            # Iterate through all pages
             for page_num in tqdm(range(num_pages)):
-                # Extract text from page
                 page = pdf_reader.pages[page_num]
                 text = page.extract_text()
 
-                # Check if adding this page's text would exceed the limit
                 if max_chars != -1 and total_chars + len(text) > max_chars:
-                    # Only add text up to the limit
                     remaining_chars = max_chars - total_chars
                     extracted_text.append(text[:remaining_chars])
                     print(f"Reached {max_chars} character limit at page {page_num + 1}")
@@ -48,29 +53,14 @@ def extract_text_from_pdf(file_path: str, max_chars: int = -1) -> Optional[str]:
 
                 extracted_text.append(text)
                 total_chars += len(text)
-                # print(f"Processed page {page_num + 1}/{num_pages}")
 
             final_text = "\n".join(extracted_text)
             print(f"\nExtraction complete! Total characters: {len(final_text)}")
             return final_text
 
-    except PyPDF2.errors.PdfReadError:  # More specific exception
+    except PyPDF2.errors.PdfReadError:
         print("Error: Invalid or corrupted PDF file")
         return None
     except Exception as e:
         print(f"An unexpected error occurred: {str(e)}")
         return None
-
-
-def extract_images_from_pdf(file_path: str, output_dir: str) -> None:
-    """
-    Placeholder function to extract images from a PDF.
-    Currently does nothing but print a message.
-    """
-    if not validate_pdf(file_path):
-        return None
-
-    # print(f"TODO: Implement image extraction from {file_path} into {output_dir}")
-    # Placeholder: In a real implementation, this would extract images
-    # and save them to the output_dir, potentially returning a list of image paths.
-    return None

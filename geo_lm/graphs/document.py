@@ -120,8 +120,7 @@ async def extract_text(state: DocumentState) -> dict:
         }
 
     try:
-        # Import PDF parser from hutton_lm (legacy) for now
-        from hutton_lm.pdf_parser import extract_text_from_pdf
+        from geo_lm.parsers.pdf import extract_text_from_pdf
 
         text = extract_text_from_pdf(source_path)
 
