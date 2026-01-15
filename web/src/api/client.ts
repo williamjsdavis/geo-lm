@@ -123,6 +123,17 @@ export async function fetchDSLDocument(id: number): Promise<DSLDocument> {
   return response.json()
 }
 
+export async function fetchDSLByDocumentId(documentId: number): Promise<DSLDocument | null> {
+  const response = await fetch(`${API_BASE}/dsl/by-document/${documentId}`)
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error('Failed to fetch DSL document')
+  }
+  return response.json()
+}
+
 // Workflow API
 export async function startProcessing(documentId: number): Promise<WorkflowStatus> {
   const response = await fetch(`${API_BASE}/workflows/${documentId}/process`, {

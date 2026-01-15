@@ -66,6 +66,25 @@ async def validate_dsl(request: DSLParseRequest):
     return await parse_dsl(request)
 
 
+@router.get("/by-document/{document_id}", response_model=DSLDocumentResponse)
+async def get_dsl_by_document(document_id: int):
+    """Get the DSL document for a given source document."""
+    try:
+        dsl_docs = await DSLDocument.find({"document_id": document_id})
+        if not dsl_docs:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No DSL document found for document {document_id}",
+            )
+        # Return the most recent one
+        return DSLDocumentResponse.model_validate(dsl_docs[-1])
+    except NotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No DSL document found for document {document_id}",
+        )
+
+
 @router.get("/{dsl_id}", response_model=DSLDocumentResponse)
 async def get_dsl_document(dsl_id: int):
     """Get a DSL document by ID."""

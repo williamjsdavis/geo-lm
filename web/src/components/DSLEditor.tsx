@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import CodeMirror from '@uiw/react-codemirror'
-import { CheckCircle, XCircle, AlertCircle, Play } from 'lucide-react'
-import { parseDSL, DSLParseResult } from '../api/client'
+import { CheckCircle, XCircle, AlertCircle, Play, Loader2 } from 'lucide-react'
+import { parseDSL, fetchDSLByDocumentId, DSLParseResult } from '../api/client'
 
 interface DSLEditorProps {
   documentId: number
-  initialDSL?: string
 }
 
 const EXAMPLE_DSL = `# Example Geology DSL
@@ -16,9 +15,23 @@ ROCK R2 [ name: "Granite"; type: intrusive; age: 50Ma ]
 DEPOSITION D1 [ rock: R1; time: 100Ma ]
 INTRUSION I1 [ rock: R2; style: stock; time: 50Ma; after: D1 ]`
 
-export default function DSLEditor({ documentId, initialDSL }: DSLEditorProps) {
-  const [dslText, setDSLText] = useState(initialDSL || '')
+export default function DSLEditor({ documentId }: DSLEditorProps) {
+  const [dslText, setDSLText] = useState('')
   const [validationResult, setValidationResult] = useState<DSLParseResult | null>(null)
+
+  // Fetch DSL for this document
+  const { data: dslDocument, isLoading: isLoadingDSL } = useQuery({
+    queryKey: ['dsl-by-document', documentId],
+    queryFn: () => fetchDSLByDocumentId(documentId),
+    refetchInterval: dslText ? false : 5000, // Poll if no DSL yet
+  })
+
+  // Update editor when DSL is fetched
+  useEffect(() => {
+    if (dslDocument?.raw_dsl && !dslText) {
+      setDSLText(dslDocument.raw_dsl)
+    }
+  }, [dslDocument])
 
   const validateMutation = useMutation({
     mutationFn: parseDSL,
@@ -49,7 +62,12 @@ export default function DSLEditor({ documentId, initialDSL }: DSLEditorProps) {
   return (
     <div className="flex flex-col h-96">
       {/* Editor */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden relative">
+        {isLoadingDSL && !dslText && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+            <Loader2 className="w-6 h-6 text-geo-500 animate-spin" />
+          </div>
+        )}
         <CodeMirror
           value={dslText}
           height="100%"
