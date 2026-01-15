@@ -88,7 +88,7 @@ class ModelManager:
             )
 
         elif provider_type == LLMProviderType.LLAMA.value:
-            api_key = settings.llama_api_key
+            api_key = settings.effective_llama_api_key
             if not api_key:
                 raise ConfigurationError(
                     "LLAMA_API_KEY not configured. "

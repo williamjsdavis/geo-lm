@@ -30,6 +30,7 @@ anthropic = "^0.40.0"
 langgraph = "^0.2.0"
 aiosqlite = "^0.20.0"
 python-multipart = "^0.0.12"
+python-dotenv = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"

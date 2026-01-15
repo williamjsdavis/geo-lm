@@ -3,7 +3,11 @@
 import os
 from typing import Optional
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env file into os.environ first (for non-prefixed variables like LLAMA_API_KEY)
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -23,6 +27,11 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     llama_api_key: Optional[str] = None
+
+    @property
+    def effective_llama_api_key(self) -> Optional[str]:
+        """Get Llama API key from either GEO_LM_LLAMA_API_KEY or LLAMA_API_KEY."""
+        return self.llama_api_key or os.environ.get("LLAMA_API_KEY")
 
     # Default Models
     default_model: str = "claude-sonnet-4-20250514"

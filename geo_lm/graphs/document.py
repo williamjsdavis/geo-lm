@@ -38,59 +38,35 @@ DSL_USER_PROMPT = """Parse the following geological description and output DSL s
 Geological description:
 {consolidated_text}
 
-DSL specification:
-```
-ROCK <ID> [
-  name: <string>;
-  type: <sedimentary|volcanic|intrusive|metamorphic>;
-  age?: <number><Ma|ka|Ga>|"?";
-]
+STRICT SYNTAX RULES:
+1. Rock names MUST be in double quotes: name: "Sandstone"
+2. Age/time MUST be a NUMBER followed by Ma, ka, or Ga: age: 40Ma, time: 35Ma
+3. If age/time is NOT specified in the text, OMIT that field entirely
+4. Do NOT use placeholders like T1, T2 - only real numbers or omit the field
+5. Use "after:" to show relative ordering when absolute times are unknown
 
-DEPOSITION <ID> [
-  rock: <ID>;
-  time?: <number><Ma|ka|Ga>|"?";
-  after?: <ID>[, <ID>...];
-]
+DSL Grammar:
+  ROCK <ID> [ name: "<string>"; type: <sedimentary|volcanic|intrusive|metamorphic> ]
+  DEPOSITION <ID> [ rock: <ID> ]
+  DEPOSITION <ID> [ rock: <ID>; after: <ID> ]
+  EROSION <ID> [ after: <ID> ]
+  INTRUSION <ID> [ rock: <ID>; style: <dike|sill|stock|batholith>; after: <ID> ]
 
-EROSION <ID> [
-  time?: <number><Ma|ka|Ga>|"?";
-  after?: <ID>[, <ID>...];
-]
-
-INTRUSION <ID> [
-  rock: <ID>;
-  style?: <dike|sill|stock|batholith>;
-  time?: <number><Ma|ka|Ga>|"?";
-  after?: <ID>[, <ID>...];
-]
-```
-
-Example:
-```
-ROCK R1 [ name: "Andesitic host"; type: volcanic; age: 40Ma ]
-ROCK R2 [ name: "Sedimentary cover"; type: sedimentary; age: 38Ma ]
-ROCK R3 [ name: "Quartz diorite porphyry"; type: intrusive; age: 35Ma ]
-
+Example with known ages:
+ROCK R1 [ name: "Andesite"; type: volcanic; age: 40Ma ]
 DEPOSITION D1 [ rock: R1; time: 40Ma ]
-DEPOSITION D2 [ rock: R2; time: 38Ma; after: D1 ]
 
-EROSION E1 [ time: 37Ma; after: D2 ]
-
-INTRUSION I1 [ rock: R3; style: stock; time: 35Ma; after: D2, E1 ]
-```
+Example with unknown ages (use after: for ordering):
+ROCK R1 [ name: "Sandstone"; type: sedimentary ]
+ROCK R2 [ name: "Granite"; type: intrusive ]
+DEPOSITION D1 [ rock: R1 ]
+INTRUSION I1 [ rock: R2; style: stock; after: D1 ]
 
 Instructions:
-- Identify all distinct rock units, depositional events, erosional events, and intrusive events.
-- Assign a unique short ID to each (e.g. R1, D1, E1, I1...).
-- Fill in all known fields (name, type, age, rock, time, style, after).
-- Use absolute ages when given; otherwise use `after:` relationships to order events.
-- Output ONLY the DSL statements (one per line), in order:
-  1. All ROCK definitions
-  2. All DEPOSITION statements
-  3. All EROSION statements
-  4. All INTRUSION statements
-
-Do NOT include any explanatory text—only the DSL code."""
+- Output ONLY valid DSL statements, one per line
+- Order: ROCK definitions first, then DEPOSITION, then EROSION, then INTRUSION
+- Use "after:" to establish sequence when absolute ages are unknown
+- No placeholders, no variables, no comments, no markdown"""
 
 DSL_RETRY_PROMPT = """The previous DSL output had validation errors. Please fix these errors and regenerate.
 
@@ -179,7 +155,7 @@ async def consolidate_text(state: DocumentState) -> dict:
 
     try:
         manager = ModelManager()
-        provider = manager.get_provider(settings.default_consolidation_model)
+        provider = await manager.get_default_provider()
 
         prompt = CONSOLIDATION_USER_PROMPT.format(text=raw_text)
 
@@ -213,7 +189,7 @@ async def generate_dsl(state: DocumentState) -> dict:
 
     try:
         manager = ModelManager()
-        provider = manager.get_provider(settings.default_dsl_model)
+        provider = await manager.get_default_provider()
 
         # Check if this is a retry
         previous_dsl = state.get("dsl_text")
@@ -312,10 +288,10 @@ async def validate_dsl(state: DocumentState) -> dict:
 
 # --- Routing Functions ---
 
-def should_retry(state: DocumentState) -> Literal["generate_dsl", "end"]:
+def should_retry(state: DocumentState) -> str:
     """Determine if we should retry DSL generation."""
     if state.get("is_valid"):
-        return "end"
+        return END
 
     retry_count = state.get("retry_count", 0)
     max_retries = settings.max_dsl_retries
@@ -323,27 +299,27 @@ def should_retry(state: DocumentState) -> Literal["generate_dsl", "end"]:
     if retry_count < max_retries:
         return "generate_dsl"
     else:
-        return "end"
+        return END
 
 
-def check_extraction(state: DocumentState) -> Literal["consolidate", "end"]:
+def check_extraction(state: DocumentState) -> str:
     """Check if text extraction succeeded."""
     if state.get("status") == "failed":
-        return "end"
+        return END
     return "consolidate"
 
 
-def check_consolidation(state: DocumentState) -> Literal["generate_dsl", "end"]:
+def check_consolidation(state: DocumentState) -> str:
     """Check if consolidation succeeded."""
     if state.get("status") == "failed":
-        return "end"
+        return END
     return "generate_dsl"
 
 
-def check_generation(state: DocumentState) -> Literal["validate_dsl", "end"]:
+def check_generation(state: DocumentState) -> str:
     """Check if DSL generation succeeded."""
     if state.get("status") == "failed":
-        return "end"
+        return END
     return "validate_dsl"
 
 

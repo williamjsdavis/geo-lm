@@ -24,7 +24,6 @@ _workflow_status: dict[int, dict] = {}
 @router.post("/{document_id}/process", response_model=WorkflowStatusResponse)
 async def start_document_processing(
     document_id: int,
-    background_tasks: BackgroundTasks,
 ):
     """
     Start processing a document through the full pipeline.
@@ -48,8 +47,8 @@ async def start_document_processing(
         "error": None,
     }
 
-    # Run workflow in background
-    background_tasks.add_task(_run_workflow, document_id, doc)
+    # Run workflow in background using asyncio.create_task
+    asyncio.create_task(_run_workflow(document_id, doc))
 
     return WorkflowStatusResponse(
         status="pending",
@@ -110,9 +109,33 @@ async def _run_workflow(document_id: int, doc: Document):
 
         else:
             _workflow_status[document_id]["status"] = "failed"
-            _workflow_status[document_id]["error"] = "; ".join(result.get("errors", ["Unknown error"]))
+            # Check for validation errors first, then general errors
+            errors = result.get("errors", [])
+            validation_errors = result.get("validation_errors", [])
+            if validation_errors:
+                _workflow_status[document_id]["error"] = f"DSL validation failed after {result.get('retry_count', 0)} retries: {'; '.join(validation_errors[:3])}"
+            elif errors:
+                _workflow_status[document_id]["error"] = "; ".join(errors)
+            else:
+                _workflow_status[document_id]["error"] = f"Workflow ended with status: {result.get('status', 'unknown')}"
+
+            # Save partial results even on failure
+            if result.get("raw_text"):
+                doc.raw_text = result["raw_text"]
+            if result.get("consolidated_text"):
+                doc.consolidated_text = result["consolidated_text"]
             doc.status = "failed"
             await doc.save()
+
+            # Save DSL document even if invalid (for debugging)
+            if result.get("dsl_text"):
+                dsl_doc = DSLDocument(
+                    document_id=document_id,
+                    raw_dsl=result["dsl_text"],
+                    is_valid=False,
+                    validation_errors="\n".join(validation_errors) if validation_errors else None,
+                )
+                await dsl_doc.save()
 
     except Exception as e:
         _workflow_status[document_id]["status"] = "failed"
