@@ -228,7 +228,7 @@ geo-lm/
 │   ├── ai/                 # LLM provider abstraction
 │   ├── parsers/dsl/        # DSL parser (Lark grammar)
 │   └── graphs/             # LangGraph workflows
-├── hutton_lm/              # Legacy CLI package
+├── hutton_lm/              # Legacy package (PDF parser, CLI)
 ├── web/                    # React + Vite frontend
 │   ├── src/
 │   │   ├── api/            # API client
