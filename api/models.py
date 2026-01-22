@@ -203,3 +203,36 @@ class HealthResponse(BaseModel):
     status: str = "ok"
     version: str
     database: str = "connected"
+
+
+# --- Mesh Schemas ---
+
+
+class ModelExtentResponse(BaseModel):
+    """Schema for model spatial extent."""
+
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+    z_min: float
+    z_max: float
+
+
+class SurfaceMeshResponse(BaseModel):
+    """Schema for a single surface mesh."""
+
+    name: str = Field(description="Surface name")
+    surface_id: str = Field(description="Surface ID from DSL")
+    color: str = Field(description="Hex color code")
+    vertices: List[List[float]] = Field(description="[[x,y,z], ...] vertex coordinates")
+    faces: List[List[int]] = Field(description="[[i,j,k], ...] triangle indices")
+
+
+class ModelMeshResponse(BaseModel):
+    """Schema for complete model mesh data for 3D visualization."""
+
+    model_id: int
+    name: str
+    surfaces: List[SurfaceMeshResponse]
+    extent: ModelExtentResponse

@@ -6,6 +6,7 @@ from geo_lm.domain import DSLDocument, GeologicalModel
 from geo_lm.exceptions import NotFoundError
 from geo_lm.graphs.model import build_model_from_dsl
 from geo_lm.gempy.persistence import GemPyPersistenceService
+from geo_lm.gempy.exporter import export_model_mesh
 from api.models import (
     ModelBuildRequest,
     ModelBuildResponse,
@@ -13,6 +14,9 @@ from api.models import (
     ModelListResponse,
     GeologicalModelResponse,
     StructuralGroupInfo,
+    ModelMeshResponse,
+    SurfaceMeshResponse,
+    ModelExtentResponse,
 )
 
 router = APIRouter(prefix="/models", tags=["models"])
@@ -118,6 +122,69 @@ async def get_model_basic(model_id: int):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
+        )
+
+
+@router.get("/{model_id}/mesh", response_model=ModelMeshResponse)
+async def get_model_mesh(model_id: int, compute: bool = True):
+    """Export model mesh data for 3D visualization.
+
+    This endpoint loads the model data from the database, rebuilds the
+    GemPy model, and extracts mesh vertices/faces for each surface.
+
+    Args:
+        model_id: The model ID to export
+        compute: If True (default), compute full meshes using GemPy.
+                 If False, return point cloud representation (faster).
+
+    Returns:
+        ModelMeshResponse with vertices and faces for each surface
+    """
+    persistence = GemPyPersistenceService()
+
+    # Load model data from database
+    model_data = await persistence.load_model_data(model_id)
+    if not model_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model {model_id} not found",
+        )
+
+    try:
+        # Export mesh data
+        mesh_data = export_model_mesh(
+            model_id=model_id,
+            data=model_data,
+            compute_meshes=compute,
+        )
+
+        # Convert to response schema
+        return ModelMeshResponse(
+            model_id=mesh_data.model_id,
+            name=mesh_data.name,
+            surfaces=[
+                SurfaceMeshResponse(
+                    name=s.name,
+                    surface_id=s.surface_id,
+                    color=s.color,
+                    vertices=s.vertices,
+                    faces=s.faces,
+                )
+                for s in mesh_data.surfaces
+            ],
+            extent=ModelExtentResponse(
+                x_min=mesh_data.extent.x_min,
+                x_max=mesh_data.extent.x_max,
+                y_min=mesh_data.extent.y_min,
+                y_max=mesh_data.extent.y_max,
+                z_min=mesh_data.extent.z_min,
+                z_max=mesh_data.extent.z_max,
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export mesh: {str(e)}",
         )
 
 

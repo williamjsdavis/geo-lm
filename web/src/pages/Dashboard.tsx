@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { FileText, Upload, Trash2, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { FileText, Trash2, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { fetchDocuments, deleteDocument, Document } from '../api/client'
 import DocumentUpload from '../components/DocumentUpload'
 

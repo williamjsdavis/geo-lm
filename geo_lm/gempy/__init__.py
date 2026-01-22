@@ -34,6 +34,7 @@ from .validator import GemPyConfigValidator, GemPyDataValidator, ValidationResul
 from .spatial import RuleBasedSpatialGenerator
 from .builder import GemPyModelBuilder, build_and_compute
 from .persistence import GemPyPersistenceService
+from .exporter import MeshExporter, ModelMeshData, SurfaceMesh, export_model_mesh
 
 __all__ = [
     # Config models
@@ -62,4 +63,9 @@ __all__ = [
     "GemPyModelBuilder",
     "build_and_compute",
     "GemPyPersistenceService",
+    # Exporter
+    "MeshExporter",
+    "ModelMeshData",
+    "SurfaceMesh",
+    "export_model_mesh",
 ]

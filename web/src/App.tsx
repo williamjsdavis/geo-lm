@@ -1,5 +1,5 @@
 import { Routes, Route, Link } from 'react-router-dom'
-import { FileText, Home, Settings } from 'lucide-react'
+import { Home, Settings } from 'lucide-react'
 import Dashboard from './pages/Dashboard'
 import DocumentView from './pages/DocumentView'
 

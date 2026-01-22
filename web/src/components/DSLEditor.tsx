@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import CodeMirror from '@uiw/react-codemirror'
-import { CheckCircle, XCircle, AlertCircle, Play, Loader2 } from 'lucide-react'
-import { parseDSL, fetchDSLByDocumentId, DSLParseResult } from '../api/client'
+import { CheckCircle, XCircle, AlertCircle, Play, Loader2, Box } from 'lucide-react'
+import { parseDSL, fetchDSLByDocumentId, buildModel, DSLParseResult } from '../api/client'
 
 interface DSLEditorProps {
   documentId: number
+  onModelBuilt?: (modelId: number) => void
 }
 
 const EXAMPLE_DSL = `# Example Geology DSL
@@ -15,9 +16,10 @@ ROCK R2 [ name: "Granite"; type: intrusive; age: 50Ma ]
 DEPOSITION D1 [ rock: R1; time: 100Ma ]
 INTRUSION I1 [ rock: R2; style: stock; time: 50Ma; after: D1 ]`
 
-export default function DSLEditor({ documentId }: DSLEditorProps) {
+export default function DSLEditor({ documentId, onModelBuilt }: DSLEditorProps) {
   const [dslText, setDSLText] = useState('')
   const [validationResult, setValidationResult] = useState<DSLParseResult | null>(null)
+  const [buildError, setBuildError] = useState<string | null>(null)
 
   // Fetch DSL for this document
   const { data: dslDocument, isLoading: isLoadingDSL } = useQuery({
@@ -39,6 +41,32 @@ export default function DSLEditor({ documentId }: DSLEditorProps) {
       setValidationResult(result)
     },
   })
+
+  const buildMutation = useMutation({
+    mutationFn: () => {
+      if (!dslDocument?.id) {
+        throw new Error('No DSL document available')
+      }
+      return buildModel({ dsl_document_id: dslDocument.id })
+    },
+    onSuccess: (result) => {
+      setBuildError(null)
+      if (result.model_id && onModelBuilt) {
+        onModelBuilt(result.model_id)
+      }
+      if (result.errors.length > 0) {
+        setBuildError(result.errors.join(', '))
+      }
+    },
+    onError: (error: Error) => {
+      setBuildError(error.message)
+    },
+  })
+
+  const handleBuild = () => {
+    setBuildError(null)
+    buildMutation.mutate()
+  }
 
   const handleValidate = () => {
     if (dslText.trim()) {
@@ -111,14 +139,36 @@ export default function DSLEditor({ documentId }: DSLEditorProps) {
             )}
           </div>
 
-          <button
-            onClick={handleValidate}
-            disabled={!dslText.trim() || validateMutation.isPending}
-            className="inline-flex items-center px-3 py-1.5 text-sm bg-geo-600 text-white rounded hover:bg-geo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Play className="w-3 h-3 mr-1" />
-            Validate
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleValidate}
+              disabled={!dslText.trim() || validateMutation.isPending}
+              className="inline-flex items-center px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Play className="w-3 h-3 mr-1" />
+              Validate
+            </button>
+
+            {validationResult?.is_valid && dslDocument?.is_valid && (
+              <button
+                onClick={handleBuild}
+                disabled={buildMutation.isPending}
+                className="inline-flex items-center px-3 py-1.5 text-sm bg-geo-600 text-white rounded hover:bg-geo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {buildMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    Building...
+                  </>
+                ) : (
+                  <>
+                    <Box className="w-3 h-3 mr-1" />
+                    Build 3D Model
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Error list */}
@@ -141,6 +191,16 @@ export default function DSLEditor({ documentId }: DSLEditorProps) {
                 ...and {validationResult.errors.length - 5} more errors
               </p>
             )}
+          </div>
+        )}
+
+        {/* Build error */}
+        {buildError && (
+          <div className="mt-3">
+            <div className="flex items-start text-sm text-orange-600 bg-orange-50 px-2 py-1 rounded">
+              <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>Build error: {buildError}</span>
+            </div>
           </div>
         )}
       </div>

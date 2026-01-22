@@ -66,10 +66,9 @@ async def parse_dsl_node(state: ModelBuildState) -> dict:
                 "status": "failed",
             }
 
-        # Store program in state for next step
-        # We can't serialize the AST directly, so we pass it through state differently
+        # DSL is valid - transform node will re-parse to get AST
+        # (AST objects can't be serialized in LangGraph state)
         return {
-            "_program": program,  # Internal, not persisted
             "status": "parsed",
         }
 
@@ -82,15 +81,25 @@ async def parse_dsl_node(state: ModelBuildState) -> dict:
 
 async def transform_to_config_node(state: ModelBuildState) -> dict:
     """Transform DSL AST to GemPy configuration."""
-    program = state.get("_program")
+    # Re-parse DSL since the AST can't be persisted in LangGraph state
+    dsl_text = state.get("dsl_text")
 
-    if not program:
+    if not dsl_text:
         return {
-            "errors": ["No parsed DSL program available"],
+            "errors": ["No DSL text available for transformation"],
             "status": "failed",
         }
 
     try:
+        # Parse again to get the AST (lightweight operation)
+        program, parse_result = parse_and_validate(dsl_text)
+
+        if not parse_result.is_valid:
+            return {
+                "errors": [str(e) for e in parse_result.errors],
+                "status": "failed",
+            }
+
         transformer = DSLToGemPyTransformer()
         model_name = state.get("model_name") or f"Model_{state['dsl_document_id']}"
 
