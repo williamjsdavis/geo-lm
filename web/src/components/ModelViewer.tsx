@@ -6,6 +6,20 @@ import { Loader2, Box, AlertCircle, Layers } from 'lucide-react'
 import * as THREE from 'three'
 import { fetchModelMesh, ModelMesh } from '../api/client'
 
+// Distinct color palette for geological surfaces
+const SURFACE_COLORS = [
+  '#E6B422', // Gold
+  '#2E8B57', // Sea green
+  '#4682B4', // Steel blue
+  '#CD853F', // Peru
+  '#9932CC', // Dark orchid
+  '#20B2AA', // Light sea green
+  '#DC143C', // Crimson
+  '#FF8C00', // Dark orange
+  '#8B4513', // Saddle brown
+  '#6A5ACD', // Slate blue
+]
+
 interface ModelViewerProps {
   modelId: number | null
   onBuildRequest?: () => void
@@ -116,12 +130,12 @@ function ModelScene({ meshData }: { meshData: ModelMesh }) {
 
       {/* Model group */}
       <group ref={groupRef}>
-        {meshData.surfaces.map((surface) => (
+        {meshData.surfaces.map((surface, index) => (
           <SurfaceMesh
             key={surface.surface_id}
             vertices={surface.vertices}
             faces={surface.faces}
-            color={surface.color}
+            color={SURFACE_COLORS[index % SURFACE_COLORS.length]}
           />
         ))}
       </group>
@@ -182,11 +196,11 @@ function SurfaceLegend({ surfaces }: { surfaces: ModelMesh['surfaces'] }) {
         <span>Surfaces</span>
       </div>
       <div className="space-y-1 max-h-32 overflow-y-auto">
-        {surfaces.map((surface) => (
+        {surfaces.map((surface, index) => (
           <div key={surface.surface_id} className="flex items-center gap-2">
             <div
               className="w-3 h-3 rounded-sm flex-shrink-0"
-              style={{ backgroundColor: surface.color }}
+              style={{ backgroundColor: SURFACE_COLORS[index % SURFACE_COLORS.length] }}
             />
             <span className="text-xs text-gray-600 truncate" title={surface.name}>
               {surface.name}
