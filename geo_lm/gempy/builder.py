@@ -203,8 +203,12 @@ class GemPyModelBuilder:
             GemPyBuildError: If computation fails
         """
         import gempy as gp
+        from gempy.core.data.grid import Grid
 
         try:
+            # Ensure DENSE grid is active for mesh generation
+            gp.set_active_grid(geo_model.grid, grid_type=[Grid.GridTypes.DENSE])
+
             gp.compute_model(gempy_model=geo_model)
             return geo_model
         except Exception as e:

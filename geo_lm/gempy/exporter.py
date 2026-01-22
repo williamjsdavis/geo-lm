@@ -108,18 +108,16 @@ class MeshExporter:
         model_id: int,
         data: GemPyModelData,
     ) -> ModelMeshData:
-        """Export meshes from a computed GemPy model."""
-        import gempy as gp
-        from gempy.modules.mesh_extranction import marching_cubes
+        """Export meshes from a computed GemPy model.
 
-        # Build and compute the model
+        Note: Meshes are generated automatically when compute_model() runs
+        with DENSE grid active. The vertices are already in world coordinates
+        (no inverse transform needed).
+        """
+        # Build and compute the model (DENSE grid is set in builder.compute)
         builder = GemPyModelBuilder()
         geo_model = builder.build(data)
         builder.compute(geo_model)
-
-        # Extract meshes using marching cubes (if not already done)
-        if geo_model.solutions.dc_meshes is None:
-            marching_cubes.set_meshes_with_marching_cubes(geo_model)
 
         # Build surface ID to config mapping
         surface_config_map = {s.surface_id: s for s in data.config.surfaces}
@@ -143,22 +141,14 @@ class MeshExporter:
                     color_idx += 1
 
                 # Extract vertices and faces
+                # Note: vertices are already in world coordinates, no transform needed
                 if element.vertices is not None and element.edges is not None:
-                    # Apply inverse transform to get world coordinates
-                    vertices_transformed = element.vertices
-                    if hasattr(geo_model, 'input_transform') and geo_model.input_transform is not None:
-                        vertices_world = geo_model.input_transform.apply_inverse(
-                            vertices_transformed
-                        )
-                    else:
-                        vertices_world = vertices_transformed
-
                     surfaces.append(
                         SurfaceMesh(
                             name=config.name if config else element_name,
                             surface_id=element_name,
                             color=color,
-                            vertices=vertices_world.tolist(),
+                            vertices=element.vertices.tolist(),
                             faces=element.edges.tolist(),
                         )
                     )
