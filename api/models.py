@@ -107,6 +107,56 @@ class GeologicalModelResponse(BaseModel):
         from_attributes = True
 
 
+class ModelBuildRequest(BaseModel):
+    """Schema for model build request."""
+
+    dsl_document_id: int = Field(..., description="ID of the DSL document to build from")
+    name: Optional[str] = Field(
+        None, min_length=1, max_length=255, description="Optional custom model name"
+    )
+
+
+class ModelBuildResponse(BaseModel):
+    """Schema for model build response."""
+
+    model_id: Optional[int] = None
+    status: str
+    errors: List[str] = []
+    warnings: List[str] = []
+
+
+class StructuralGroupInfo(BaseModel):
+    """Schema for structural group info in model data."""
+
+    group_name: str
+    surfaces: List[str]
+    relation: str
+
+
+class ModelDataResponse(BaseModel):
+    """Schema for detailed model data response."""
+
+    id: int
+    name: str
+    status: str
+    document_id: Optional[int] = None
+    dsl_document_id: Optional[int] = None
+    extent: dict = {}
+    resolution: dict = {}
+    surface_points_count: int = 0
+    orientations_count: int = 0
+    structural_groups: List[StructuralGroupInfo] = []
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class ModelListResponse(BaseModel):
+    """Schema for list of models."""
+
+    models: List[GeologicalModelResponse]
+    total: int
+
+
 # --- Workflow Schemas ---
 
 
