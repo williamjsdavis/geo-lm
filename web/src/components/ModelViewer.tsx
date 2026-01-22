@@ -6,6 +6,20 @@ import { Loader2, Box, AlertCircle, Layers } from 'lucide-react'
 import * as THREE from 'three'
 import { fetchModelMesh, ModelMesh } from '../api/client'
 
+// Distinct color palette for geological surfaces
+const SURFACE_COLORS = [
+  '#E6B422', // Gold
+  '#2E8B57', // Sea green
+  '#4682B4', // Steel blue
+  '#CD853F', // Peru
+  '#9932CC', // Dark orchid
+  '#20B2AA', // Light sea green
+  '#DC143C', // Crimson
+  '#FF8C00', // Dark orange
+  '#8B4513', // Saddle brown
+  '#6A5ACD', // Slate blue
+]
+
 interface ModelViewerProps {
   modelId: number | null
   onBuildRequest?: () => void
@@ -19,8 +33,13 @@ function SurfaceMesh({ vertices, faces, color }: {
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
 
-    // Flatten vertices into a typed array
-    const positions = new Float32Array(vertices.flat())
+    // Transform from Z-up (GemPy/geological) to Y-up (Three.js)
+    // GemPy: [x, y, z] where z is elevation
+    // Three.js: [x, y, z] where y is vertical
+    // Transform: [x, y, z] -> [x, z, -y]
+    const positions = new Float32Array(
+      vertices.flatMap(([x, y, z]) => [x, z, -y])
+    )
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 
     // Flatten faces into indices
@@ -50,20 +69,30 @@ function ModelScene({ meshData }: { meshData: ModelMesh }) {
   const groupRef = useRef<THREE.Group>(null)
 
   // Calculate center and scale for camera positioning
-  const { center, scale } = useMemo(() => {
+  // Apply same Z-up to Y-up transform: [x, y, z] -> [x, z, -y]
+  const { center, scale, gridY } = useMemo(() => {
     const extent = meshData.extent
+
+    // Transform extent from GemPy coords to Three.js coords
+    // Three.js X = GemPy X
+    // Three.js Y = GemPy Z (elevation)
+    // Three.js Z = -GemPy Y
     const centerX = (extent.x_min + extent.x_max) / 2
-    const centerY = (extent.y_min + extent.y_max) / 2
-    const centerZ = (extent.z_min + extent.z_max) / 2
+    const centerY = (extent.z_min + extent.z_max) / 2  // GemPy Z -> Three.js Y
+    const centerZ = -(extent.y_min + extent.y_max) / 2 // -GemPy Y -> Three.js Z
 
     const sizeX = extent.x_max - extent.x_min
-    const sizeY = extent.y_max - extent.y_min
-    const sizeZ = extent.z_max - extent.z_min
+    const sizeY = extent.z_max - extent.z_min  // GemPy Z range
+    const sizeZ = extent.y_max - extent.y_min  // GemPy Y range
     const maxSize = Math.max(sizeX, sizeY, sizeZ)
+
+    // Grid should be at the bottom (minimum elevation = z_min in GemPy = y_min in Three.js)
+    const gridY = extent.z_min
 
     return {
       center: [centerX, centerY, centerZ] as [number, number, number],
       scale: maxSize,
+      gridY,
     }
   }, [meshData.extent])
 
@@ -101,21 +130,20 @@ function ModelScene({ meshData }: { meshData: ModelMesh }) {
 
       {/* Model group */}
       <group ref={groupRef}>
-        {meshData.surfaces.map((surface) => (
+        {meshData.surfaces.map((surface, index) => (
           <SurfaceMesh
             key={surface.surface_id}
             vertices={surface.vertices}
             faces={surface.faces}
-            color={surface.color}
+            color={SURFACE_COLORS[index % SURFACE_COLORS.length]}
           />
         ))}
       </group>
 
-      {/* Grid helper */}
+      {/* Grid helper - now correctly positioned in Y-up coordinate system */}
       <gridHelper
         args={[scale * 2, 20, '#888888', '#444444']}
-        position={[center[0], meshData.extent.z_min, center[2]]}
-        rotation={[Math.PI / 2, 0, 0]}
+        position={[center[0], gridY, center[2]]}
       />
     </>
   )
@@ -168,11 +196,11 @@ function SurfaceLegend({ surfaces }: { surfaces: ModelMesh['surfaces'] }) {
         <span>Surfaces</span>
       </div>
       <div className="space-y-1 max-h-32 overflow-y-auto">
-        {surfaces.map((surface) => (
+        {surfaces.map((surface, index) => (
           <div key={surface.surface_id} className="flex items-center gap-2">
             <div
               className="w-3 h-3 rounded-sm flex-shrink-0"
-              style={{ backgroundColor: surface.color }}
+              style={{ backgroundColor: SURFACE_COLORS[index % SURFACE_COLORS.length] }}
             />
             <span className="text-xs text-gray-600 truncate" title={surface.name}>
               {surface.name}
