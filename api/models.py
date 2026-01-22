@@ -107,6 +107,56 @@ class GeologicalModelResponse(BaseModel):
         from_attributes = True
 
 
+class ModelBuildRequest(BaseModel):
+    """Schema for model build request."""
+
+    dsl_document_id: int = Field(..., description="ID of the DSL document to build from")
+    name: Optional[str] = Field(
+        None, min_length=1, max_length=255, description="Optional custom model name"
+    )
+
+
+class ModelBuildResponse(BaseModel):
+    """Schema for model build response."""
+
+    model_id: Optional[int] = None
+    status: str
+    errors: List[str] = []
+    warnings: List[str] = []
+
+
+class StructuralGroupInfo(BaseModel):
+    """Schema for structural group info in model data."""
+
+    group_name: str
+    surfaces: List[str]
+    relation: str
+
+
+class ModelDataResponse(BaseModel):
+    """Schema for detailed model data response."""
+
+    id: int
+    name: str
+    status: str
+    document_id: Optional[int] = None
+    dsl_document_id: Optional[int] = None
+    extent: dict = {}
+    resolution: dict = {}
+    surface_points_count: int = 0
+    orientations_count: int = 0
+    structural_groups: List[StructuralGroupInfo] = []
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class ModelListResponse(BaseModel):
+    """Schema for list of models."""
+
+    models: List[GeologicalModelResponse]
+    total: int
+
+
 # --- Workflow Schemas ---
 
 
@@ -153,3 +203,36 @@ class HealthResponse(BaseModel):
     status: str = "ok"
     version: str
     database: str = "connected"
+
+
+# --- Mesh Schemas ---
+
+
+class ModelExtentResponse(BaseModel):
+    """Schema for model spatial extent."""
+
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+    z_min: float
+    z_max: float
+
+
+class SurfaceMeshResponse(BaseModel):
+    """Schema for a single surface mesh."""
+
+    name: str = Field(description="Surface name")
+    surface_id: str = Field(description="Surface ID from DSL")
+    color: str = Field(description="Hex color code")
+    vertices: List[List[float]] = Field(description="[[x,y,z], ...] vertex coordinates")
+    faces: List[List[int]] = Field(description="[[i,j,k], ...] triangle indices")
+
+
+class ModelMeshResponse(BaseModel):
+    """Schema for complete model mesh data for 3D visualization."""
+
+    model_id: int
+    name: str
+    surfaces: List[SurfaceMeshResponse]
+    extent: ModelExtentResponse

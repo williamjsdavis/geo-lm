@@ -47,6 +47,53 @@ export interface WorkflowStatus {
   error: string | null
 }
 
+// Model types
+export interface ModelBuildRequest {
+  dsl_document_id: number
+  name?: string
+}
+
+export interface ModelBuildResponse {
+  model_id: number | null
+  status: string
+  errors: string[]
+  warnings: string[]
+}
+
+export interface ModelExtent {
+  x_min: number
+  x_max: number
+  y_min: number
+  y_max: number
+  z_min: number
+  z_max: number
+}
+
+export interface SurfaceMesh {
+  name: string
+  surface_id: string
+  color: string
+  vertices: number[][]
+  faces: number[][]
+}
+
+export interface ModelMesh {
+  model_id: number
+  name: string
+  surfaces: SurfaceMesh[]
+  extent: ModelExtent
+}
+
+export interface GeologicalModel {
+  id: number
+  name: string
+  document_id: number | null
+  dsl_document_id: number | null
+  status: string
+  created_at: string | null
+  updated_at: string | null
+}
+
 // Documents API
 export async function fetchDocuments(): Promise<DocumentList> {
   const response = await fetch(`${API_BASE}/documents`)
@@ -158,6 +205,40 @@ export async function fetchHealth(): Promise<{ status: string; version: string }
   const response = await fetch(`${API_BASE}/health`)
   if (!response.ok) {
     throw new Error('API not available')
+  }
+  return response.json()
+}
+
+// Models API
+export async function buildModel(request: ModelBuildRequest): Promise<ModelBuildResponse> {
+  const response = await fetch(`${API_BASE}/models/build`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to build model' }))
+    throw new Error(error.detail || 'Failed to build model')
+  }
+  return response.json()
+}
+
+export async function fetchModelMesh(modelId: number, compute: boolean = true): Promise<ModelMesh> {
+  const url = new URL(`${API_BASE}/models/${modelId}/mesh`, window.location.origin)
+  url.searchParams.set('compute', compute.toString())
+
+  const response = await fetch(url.toString())
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to fetch model mesh' }))
+    throw new Error(error.detail || 'Failed to fetch model mesh')
+  }
+  return response.json()
+}
+
+export async function fetchModelsByDsl(dslDocumentId: number): Promise<{ models: GeologicalModel[]; total: number }> {
+  const response = await fetch(`${API_BASE}/models/by-dsl/${dslDocumentId}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch models')
   }
   return response.json()
 }

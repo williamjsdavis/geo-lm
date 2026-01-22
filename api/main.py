@@ -9,7 +9,7 @@ from geo_lm import __version__
 from geo_lm.config import settings
 from geo_lm.database.connection import init_db, DatabaseConnection
 from api.models import HealthResponse
-from api.routers import documents, dsl, workflows
+from api.routers import documents, dsl, models, workflows
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.add_middleware(
 # Include routers
 app.include_router(documents.router, prefix="/api")
 app.include_router(dsl.router, prefix="/api")
+app.include_router(models.router, prefix="/api")
 app.include_router(workflows.router, prefix="/api")
 
 

@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Play, Loader2, CheckCircle, XCircle, FileText } from 'lucide-react'
-import { fetchDocument, startProcessing, fetchWorkflowStatus } from '../api/client'
+import { fetchDocument, startProcessing, fetchWorkflowStatus, fetchModelsByDsl, fetchDSLByDocumentId } from '../api/client'
 import DSLEditor from '../components/DSLEditor'
 import ProcessingPanel from '../components/ProcessingPanel'
+import ModelViewer from '../components/ModelViewer'
 
 export default function DocumentView() {
   const { id } = useParams<{ id: string }>()
   const documentId = parseInt(id!, 10)
   const queryClient = useQueryClient()
   const [isProcessing, setIsProcessing] = useState(false)
+  const [activeModelId, setActiveModelId] = useState<number | null>(null)
 
   const { data: document, isLoading, error } = useQuery({
     queryKey: ['document', documentId],
@@ -32,6 +34,33 @@ export default function DocumentView() {
     enabled: isProcessing,
     refetchInterval: isProcessing ? 1000 : false,
   })
+
+  // Fetch DSL document to get its ID for model lookup
+  const { data: dslDocument } = useQuery({
+    queryKey: ['dsl-by-document', documentId],
+    queryFn: () => fetchDSLByDocumentId(documentId),
+  })
+
+  // Fetch existing models for this DSL document
+  const { data: modelsData } = useQuery({
+    queryKey: ['models-by-dsl', dslDocument?.id],
+    queryFn: () => fetchModelsByDsl(dslDocument!.id),
+    enabled: !!dslDocument?.id,
+  })
+
+  // Set the most recent model as active if we don't have one selected
+  if (modelsData?.models?.length && !activeModelId) {
+    setActiveModelId(modelsData.models[0].id)
+  }
+
+  // Handler for when a model is built
+  const handleModelBuilt = useCallback((modelId: number) => {
+    setActiveModelId(modelId)
+    // Invalidate models query to refresh the list
+    if (dslDocument?.id) {
+      queryClient.invalidateQueries({ queryKey: ['models-by-dsl', dslDocument.id] })
+    }
+  }, [dslDocument?.id, queryClient])
 
   // Stop polling when completed or failed
   if (workflowStatus && (workflowStatus.status === 'completed' || workflowStatus.status === 'failed')) {
@@ -112,14 +141,14 @@ export default function DocumentView() {
         <ProcessingPanel status={workflowStatus} />
       )}
 
-      {/* Content Tabs */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Raw/Consolidated Text */}
+      {/* Content Panels - 3 columns */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Left: Raw/Consolidated Text */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
             <h3 className="font-medium text-gray-900">Text Content</h3>
           </div>
-          <div className="p-4 max-h-96 overflow-y-auto">
+          <div className="p-4 max-h-[500px] overflow-y-auto">
             {document.consolidated_text ? (
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Consolidated</h4>
@@ -147,12 +176,22 @@ export default function DocumentView() {
           </div>
         </div>
 
-        {/* DSL Editor */}
+        {/* Center: DSL Editor */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
             <h3 className="font-medium text-gray-900">Geology DSL</h3>
           </div>
-          <DSLEditor documentId={documentId} />
+          <DSLEditor documentId={documentId} onModelBuilt={handleModelBuilt} />
+        </div>
+
+        {/* Right: 3D Model Viewer */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <h3 className="font-medium text-gray-900">3D Model</h3>
+          </div>
+          <div className="h-[500px]">
+            <ModelViewer modelId={activeModelId} />
+          </div>
         </div>
       </div>
     </div>
