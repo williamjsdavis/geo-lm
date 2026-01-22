@@ -74,6 +74,50 @@ async def list_models():
     )
 
 
+@router.get("/test/mesh", response_model=ModelMeshResponse)
+async def get_test_mesh():
+    """Return hardcoded test mesh data for frontend debugging.
+
+    Creates 3 flat colored planes at different Z levels to verify
+    the frontend Three.js rendering works correctly.
+    """
+    def create_flat_plane(z_level: float, size: float, color: str, name: str):
+        half = size / 2
+        return SurfaceMeshResponse(
+            name=name,
+            surface_id=name,
+            color=color,
+            vertices=[
+                [-half, -half, z_level],
+                [half, -half, z_level],
+                [half, half, z_level],
+                [-half, half, z_level],
+            ],
+            faces=[
+                [0, 1, 2],
+                [0, 2, 3],
+            ],
+        )
+
+    return ModelMeshResponse(
+        model_id=9999,
+        name="TestPlanes",
+        surfaces=[
+            create_flat_plane(-200, 400, "#FF0000", "RedPlane"),
+            create_flat_plane(-400, 400, "#00FF00", "GreenPlane"),
+            create_flat_plane(-600, 400, "#0000FF", "BluePlane"),
+        ],
+        extent=ModelExtentResponse(
+            x_min=-500,
+            x_max=500,
+            y_min=-500,
+            y_max=500,
+            z_min=-800,
+            z_max=0,
+        ),
+    )
+
+
 @router.get("/{model_id}", response_model=ModelDataResponse)
 async def get_model(model_id: int):
     """Get detailed model data and summary."""

@@ -76,6 +76,8 @@ function ModelScene({ meshData }: { meshData: ModelMesh }) {
         makeDefault
         position={[center[0] + cameraDistance, center[1] + cameraDistance * 0.5, center[2] + cameraDistance]}
         fov={50}
+        near={scale * 0.01}
+        far={scale * 20}
       />
       <OrbitControls
         target={center}

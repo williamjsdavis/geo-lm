@@ -223,7 +223,7 @@ export async function buildModel(request: ModelBuildRequest): Promise<ModelBuild
   return response.json()
 }
 
-export async function fetchModelMesh(modelId: number, compute: boolean = false): Promise<ModelMesh> {
+export async function fetchModelMesh(modelId: number, compute: boolean = true): Promise<ModelMesh> {
   const url = new URL(`${API_BASE}/models/${modelId}/mesh`, window.location.origin)
   url.searchParams.set('compute', compute.toString())
 
