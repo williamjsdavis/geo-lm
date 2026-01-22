@@ -19,8 +19,13 @@ function SurfaceMesh({ vertices, faces, color }: {
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
 
-    // Flatten vertices into a typed array
-    const positions = new Float32Array(vertices.flat())
+    // Transform from Z-up (GemPy/geological) to Y-up (Three.js)
+    // GemPy: [x, y, z] where z is elevation
+    // Three.js: [x, y, z] where y is vertical
+    // Transform: [x, y, z] -> [x, z, -y]
+    const positions = new Float32Array(
+      vertices.flatMap(([x, y, z]) => [x, z, -y])
+    )
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 
     // Flatten faces into indices
@@ -50,20 +55,30 @@ function ModelScene({ meshData }: { meshData: ModelMesh }) {
   const groupRef = useRef<THREE.Group>(null)
 
   // Calculate center and scale for camera positioning
-  const { center, scale } = useMemo(() => {
+  // Apply same Z-up to Y-up transform: [x, y, z] -> [x, z, -y]
+  const { center, scale, gridY } = useMemo(() => {
     const extent = meshData.extent
+
+    // Transform extent from GemPy coords to Three.js coords
+    // Three.js X = GemPy X
+    // Three.js Y = GemPy Z (elevation)
+    // Three.js Z = -GemPy Y
     const centerX = (extent.x_min + extent.x_max) / 2
-    const centerY = (extent.y_min + extent.y_max) / 2
-    const centerZ = (extent.z_min + extent.z_max) / 2
+    const centerY = (extent.z_min + extent.z_max) / 2  // GemPy Z -> Three.js Y
+    const centerZ = -(extent.y_min + extent.y_max) / 2 // -GemPy Y -> Three.js Z
 
     const sizeX = extent.x_max - extent.x_min
-    const sizeY = extent.y_max - extent.y_min
-    const sizeZ = extent.z_max - extent.z_min
+    const sizeY = extent.z_max - extent.z_min  // GemPy Z range
+    const sizeZ = extent.y_max - extent.y_min  // GemPy Y range
     const maxSize = Math.max(sizeX, sizeY, sizeZ)
+
+    // Grid should be at the bottom (minimum elevation = z_min in GemPy = y_min in Three.js)
+    const gridY = extent.z_min
 
     return {
       center: [centerX, centerY, centerZ] as [number, number, number],
       scale: maxSize,
+      gridY,
     }
   }, [meshData.extent])
 
@@ -111,11 +126,10 @@ function ModelScene({ meshData }: { meshData: ModelMesh }) {
         ))}
       </group>
 
-      {/* Grid helper */}
+      {/* Grid helper - now correctly positioned in Y-up coordinate system */}
       <gridHelper
         args={[scale * 2, 20, '#888888', '#444444']}
-        position={[center[0], meshData.extent.z_min, center[2]]}
-        rotation={[Math.PI / 2, 0, 0]}
+        position={[center[0], gridY, center[2]]}
       />
     </>
   )
