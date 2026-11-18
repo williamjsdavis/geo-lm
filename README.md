@@ -313,3 +313,9 @@ We welcome contributions to `geo-lm`! If you have ideas for improvements, new fe
 ## Notes
 
 This package was originally called `hutton-lm`, but was renamed to `geo-lm`.
+
+---
+
+## License
+
+The MIT License covers the original code in this repository. Third-party material is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and is under its own terms.
