@@ -1,5 +1,7 @@
 # geo-lm
 
+> Status: archived. This project is no longer actively maintained, and the repository is now read-only. The code remains available under the MIT License (see [LICENSE](LICENSE)), so you're welcome to use or fork it on those terms. Third-party material is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Issues and pull requests won't be reviewed.
+
 A prototype language model interface for generating geological models!
 
 ![Logo|500](static/image4.png)
